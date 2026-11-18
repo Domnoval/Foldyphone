@@ -107,8 +107,87 @@
     return { min, max, size: max.map((v, k) => v - min[k]) };
   }
 
+
+  /* Flat geometry. Most furniture parts are a side profile pushed sideways: a convex polygon in the
+     side plane plus a span across the width. Raked parts make bounding boxes lie, so these work on
+     the real outline. */
+  const signedArea = (p) => p.reduce((a, [x1, y1], i) => {
+    const [x2, y2] = p[(i + 1) % p.length];
+    return a + (x1 * y2 - x2 * y1) / 2;
+  }, 0);
+  const ccw = (p) => (signedArea(p) < 0 ? [...p].reverse() : p);
+  const polyArea = (p) => (p.length < 3 ? 0 : Math.abs(signedArea(p)));
+  function polyCentroid(p) {
+    const a = signedArea(p);
+    let cx = 0, cy = 0;
+    p.forEach(([x1, y1], i) => {
+      const [x2, y2] = p[(i + 1) % p.length];
+      const f = x1 * y2 - x2 * y1;
+      cx += (x1 + x2) * f;
+      cy += (y1 + y2) * f;
+    });
+    return [cx / (6 * a), cy / (6 * a)];
+  }
+
+  /* The shared region of two convex outlines (Sutherland-Hodgman). A lap joint's glue area. */
+  function clipConvex(subject, clip) {
+    let out = ccw(subject);
+    const c = ccw(clip);
+    for (let i = 0; i < c.length && out.length; i++) {
+      const a = c[i], b = c[(i + 1) % c.length];
+      const side = (q) => (b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]);
+      const input = out;
+      out = [];
+      input.forEach((p, j) => {
+        const q = input[(j + 1) % input.length];
+        const sp = side(p), sq = side(q);
+        if (sp >= 0) out.push(p);
+        if ((sp >= 0) !== (sq >= 0)) {
+          const t = sp / (sp - sq);
+          out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]);
+        }
+      });
+    }
+    return out;
+  }
+
+  /* How far two convex outlines sink into each other; zero or less means they only touch or miss. */
+  function penetration(pa, pb) {
+    let least = Infinity;
+    for (const poly of [pa, pb]) {
+      for (let i = 0; i < poly.length; i++) {
+        const [x1, y1] = poly[i], [x2, y2] = poly[(i + 1) % poly.length];
+        const len = Math.hypot(x2 - x1, y2 - y1);
+        if (len < 1e-9) continue;
+        const nx = (y2 - y1) / len, ny = -(x2 - x1) / len;
+        const span = (q) => q.reduce(([lo, hi], [x, y]) => {
+          const d = x * nx + y * ny;
+          return [Math.min(lo, d), Math.max(hi, d)];
+        }, [Infinity, -Infinity]);
+        const [a0, a1] = span(pa), [b0, b1] = span(pb);
+        least = Math.min(least, Math.min(a1, b1) - Math.max(a0, b0));
+      }
+    }
+    return least;
+  }
+
+  /* Parts as prisms: { id, poly: [[u,v],...], x: [x0,x1] }. Same rule as overlaps(): touching is fine. */
+  function prismOverlaps(parts, eps = 1 / 64) {
+    const hits = [];
+    for (let i = 0; i < parts.length; i++) {
+      for (let j = i + 1; j < parts.length; j++) {
+        const a = parts[i], b = parts[j];
+        const dx = Math.min(a.x[1], b.x[1]) - Math.max(a.x[0], b.x[0]);
+        if (dx <= eps) continue;
+        const depth = Math.min(dx, penetration(a.poly, b.poly));
+        if (depth > eps) hits.push({ a: a.id, b: b.id, depth });
+      }
+    }
+    return hits;
+  }
+
   /* Measure both diagonals of a frame. Equal means square. This is what they should read. */
   const diagonal = (a, b) => Math.hypot(a, b);
 
-  return { STOCK, frac, cutList, packLinear, overlaps, envelope, diagonal };
+  return { STOCK, frac, cutList, packLinear, overlaps, envelope, diagonal, polyArea, polyCentroid, clipConvex, penetration, prismOverlaps };
 });

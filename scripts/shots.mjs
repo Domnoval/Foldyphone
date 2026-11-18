@@ -6,7 +6,7 @@
    Sizes are CSS pixels and they are ESTIMATES: a screenshot from the phone came in at the
    1968 x 2184 aspect of a Fold 7-class inner screen, and these assume a 2.625 pixel ratio.
    Replace them with the real readout from the Fold Calibration page once it has been run. */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -36,6 +36,16 @@ writeFileSync(wrapped, `<!doctype html><html><head><meta charset="utf-8">
 <style>body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
 </head><body>${readFileSync(src, 'utf8')}</body></html>`);
 
+/* The container cannot reach the script CDNs the published page uses, so serve the same pinned
+   files from node_modules (run `npm install` first). The page itself is unchanged. */
+const local = (url) => {
+  const js = url.match(/cdn\.jsdelivr\.net\/npm\/([^@/]+)@[^/]+\/(.+)$/);
+  if (js) return resolve('node_modules', js[1], js[2]);
+  const three = url.match(/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r\d+\/(.+)$/);
+  if (three) return resolve('node_modules/three/build', three[1]);
+  return null;
+};
+
 const browser = await chromium.launch();
 for (const [posture, v] of Object.entries(POSTURES)) {
   const ctx = await browser.newContext({
@@ -43,6 +53,10 @@ for (const [posture, v] of Object.entries(POSTURES)) {
     deviceScaleFactor: scale, isMobile: true, hasTouch: true,
   });
   const page = await ctx.newPage();
+  await page.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com/, (route) => {
+    const file = local(route.request().url());
+    return file && existsSync(file) ? route.fulfill({ path: file, contentType: 'text/javascript' }) : route.abort();
+  });
   const problems = [];
   page.on('console', (m) => m.type() === 'error' && problems.push(m.text()));
   page.on('pageerror', (e) => problems.push(e.message));
@@ -53,10 +67,12 @@ for (const [posture, v] of Object.entries(POSTURES)) {
   }
   await page.goto(pathToFileURL(wrapped).href);
   await page.waitForTimeout(400);
+  if (process.env.DO) await page.evaluate(process.env.DO);   // optional: poke the page before the picture
+  await page.waitForTimeout(100);
   const sideways = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   if (sideways) problems.push('page scrolls sideways');
-  const out = `.shots/${name}-${posture}.png`;
-  await page.screenshot({ path: out });
+  const out = `.shots/${name}-${posture}${process.env.TAG ? '-' + process.env.TAG : ''}.png`;
+  await page.screenshot({ path: out, fullPage: !!process.env.FULL });
   console.log(`${out}  ${v.width}x${v.height}${problems.length ? '  ! ' + problems.join(' | ') : ''}`);
   await ctx.close();
 }

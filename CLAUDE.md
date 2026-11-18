@@ -22,7 +22,7 @@ kit/          shared by every project
   probe.html    Fold Calibration page
 projects/
   _template/    copy this to start something
-  <name>/       README.md (brief + decisions), reference/ (photos), plan.html (the page)
+  <name>/       README.md (brief + decisions), reference/ (photos), model.js (+ test), plan.html (the page)
 scripts/
   build.mjs     inline kit files into one self-contained page -> dist/
   shots.mjs     screenshot a built page at Fold sizes -> .shots/
@@ -35,6 +35,8 @@ scripts/
 1. Edit `projects/<name>/plan.html`. Link kit files relatively (`../../kit/codex.css`).
 2. `node scripts/build.mjs projects/<name>/plan.html`
 3. `node scripts/shots.mjs dist/<name>.html` and look at cover, open and flex. Any `!` in the output is a bug.
+   Run `npm install` once first: the container cannot reach the script CDNs, so the shots serve pinned libraries from `node_modules`.
+   `DO='<js>'` pokes the page before the picture, `TAG=<name>` names the set, `FULL=1` captures the whole scroll.
 4. Publish `dist/<name>.html` with the Artifact tool. Record the artifact URL in the project README so a later session updates the same link instead of making a new one.
 5. `npm test` before committing if `kit/` changed.
 

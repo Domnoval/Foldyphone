@@ -62,6 +62,26 @@ test('envelope sums the parts', () => {
   assert.deepEqual(e.size, [48, 3.5, 30]);
 });
 
+test('lap area and centroid of two crossing boards', () => {
+  const flat = [[0, 0], [10, 0], [10, 3.5], [0, 3.5]];
+  const upright = [[4, -5], [7.5, -5], [7.5, 9], [4, 9]];
+  const lap = L.clipConvex(flat, upright);
+  assert.ok(Math.abs(L.polyArea(lap) - 12.25) < 1e-9);
+  const [cx, cy] = L.polyCentroid(lap);
+  assert.ok(Math.abs(cx - 5.75) < 1e-9 && Math.abs(cy - 1.75) < 1e-9);
+  assert.equal(L.polyArea(L.clipConvex(flat, [[20, 0], [21, 0], [21, 1]])), 0);
+});
+
+test('raked parts are judged by their real outline, not their bounding box', () => {
+  // two parallel boards leaning at 45 degrees, a clear gap between them: their boxes overlap, they do not
+  const lean = (off) => [[off, 0], [off + 2, 0], [off + 12, 10], [off + 10, 10]];
+  const a = { id: 'a', poly: lean(0), x: [0, 1.5] }, b = { id: 'b', poly: lean(3), x: [0, 1.5] };
+  assert.deepEqual(L.prismOverlaps([a, b]), []);
+  assert.equal(L.prismOverlaps([a, { id: 'c', poly: lean(1), x: [0, 1.5] }]).length, 1);
+  // same outline, side by side across the width: a lap joint, not a collision
+  assert.deepEqual(L.prismOverlaps([a, { id: 'd', poly: lean(0), x: [1.5, 3] }]), []);
+});
+
 test('posture follows the same rules as fold.css', () => {
   assert.equal(classify({ w: 344 }), 'cover');
   assert.equal(classify({ w: 690 }), 'open');

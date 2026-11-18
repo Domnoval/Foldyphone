@@ -20,7 +20,9 @@ A studio that fits in a folding phone. Send a photo and a sentence from the gara
 
 ## Projects
 
-- [`loveseat`](projects/loveseat/) — two pallets and a lounger with a Z-leg stance.
+- [`loveseat`](projects/loveseat/) — two pallets and a lounger with a Z-leg stance. [Open the plan](https://claude.ai/artifact/7hfcNALKDtw3jA7uMeg7BS).
+
+The [Fold Calibration](https://claude.ai/artifact/H5GXoUpoiDsLxZJEKWXJAe) page measures the phone in each posture. Both links are private to the repo owner.
 
 ## Commands
 

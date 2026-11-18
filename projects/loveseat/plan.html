@@ -1,0 +1,411 @@
+<title>Pallet Loveseat</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel&family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600&display=swap">
+<link rel="stylesheet" href="../../kit/codex.css">
+<link rel="stylesheet" href="../../kit/fold.css">
+<style>
+  /* Layout: a working drawing. The model is the sheet and stays in view; the deck is the schedule
+     beside it: shape, build order, cut list, what to buy, checks. */
+  :root {
+    --role-pallet: var(--parchment);
+    --role-moved: var(--noise);
+    --role-rail: var(--cinnabar);
+    --role-leg: var(--solar);
+    --role-runner: var(--signal);
+    --role-spreader: var(--halftone);
+    --role-bolt: var(--grid);
+  }
+  h1, h2, h3, p, ol, ul, dl, dd { margin: 0; }
+  ol, ul { padding: 0; list-style: none; }
+
+  .fold-stage { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--space-3); }
+  .title-block { display: grid; gap: var(--space-1); }
+  .title-block h1 { font-size: var(--t-21); }
+  .title-block p { font-size: var(--t-8); line-height: 13px; letter-spacing: 0.137em; }
+
+  #view { position: relative; min-height: 0; border: var(--hairline) solid var(--line-faint); }
+  #view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #pick { position: absolute; left: var(--space-3); bottom: var(--space-3); right: var(--space-3); pointer-events: none; color: var(--ink); text-shadow: 0 0 5px var(--ground), 0 0 5px var(--ground); }
+
+  .stepper { display: grid; grid-template-columns: 55px minmax(0, 1fr) 55px; gap: var(--space-3); align-items: center; }
+  .stepper .crystal { padding: 0; font: 400 var(--t-21) / 1 var(--font-grid); }
+  .stepper .crystal:disabled { opacity: 0.3; }
+  .stepper div { display: grid; text-align: center; min-width: 0; }
+  .stepper strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* cover: keep the model on screen while the schedule scrolls under it */
+  @media (max-width: 599px) {
+    .fold { padding-top: 0; }
+    .fold-stage { aspect-ratio: auto; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; padding-block: var(--space-3); background: var(--ground); border-bottom: var(--hairline) solid var(--line-faint); }
+    #view { height: min(34dvh, 320px); }
+  }
+
+  section > h2 { font-size: var(--t-13); line-height: 21px; padding-bottom: var(--space-3); border-bottom: var(--hairline) solid var(--line); margin-bottom: var(--space-5); }
+  .lede { max-width: 34em; }
+
+  dl.rows { display: grid; }
+  dl.rows > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-5); align-items: baseline; padding-block: var(--space-3); border-top: var(--hairline) solid var(--line-faint); }
+  dl.rows dt { color: var(--ink-muted); }
+  dl.rows dd { text-align: right; }
+
+  .control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--space-5); }
+  .control input { grid-column: 1 / -1; }
+  .control + h3, .controls h3 { margin-top: var(--space-8); color: var(--ink-muted); font: 400 var(--t-13) / 21px var(--font-signal); }
+  input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: var(--space-21); margin: 0; background: linear-gradient(var(--line), var(--line)) center / 100% 1px no-repeat; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border: 0; border-radius: 0; background: var(--solar); transform: rotate(45deg); }
+  input[type="range"]::-moz-range-thumb { width: 15px; height: 15px; border: 0; border-radius: 0; background: var(--solar); transform: rotate(45deg); }
+  input[type="range"]:focus-visible { outline: 1px solid var(--solar); outline-offset: -8px; }
+  .controls .crystal { margin-top: var(--space-5); }
+
+  ol.steps { display: grid; counter-reset: step; }
+  ol.steps li { counter-increment: step; display: grid; grid-template-columns: 21px minmax(0, 1fr); column-gap: var(--space-5); row-gap: var(--space-3); padding-block: var(--space-5); border-top: var(--hairline) solid var(--line-faint); cursor: pointer; }
+  ol.steps li::before { content: counter(step); font: 400 var(--t-13) / 21px var(--font-grid); color: var(--ink-muted); }
+  ol.steps li > * { grid-column: 2; }
+  ol.steps li > h3 { font: 600 var(--t-13) / 21px var(--font-signal); }
+  ol.steps li[aria-current="step"]::before { color: var(--solar); }
+  ol.steps li[aria-current="step"] h3 { color: var(--solar); }
+  .tagged { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); column-gap: var(--space-3); color: var(--ink-muted); }
+  .tagged b { font-weight: 400; color: var(--ink); }
+
+  ul.legend { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); margin-bottom: var(--space-5); }
+  ul.legend li { display: flex; align-items: center; gap: var(--space-2); color: var(--ink-muted); }
+  .swatch { width: 8px; height: 8px; flex: none; border: var(--hairline) solid var(--line); }
+
+  ul.cuts li { display: grid; grid-template-columns: 13px minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-1); align-items: baseline; padding-block: var(--space-5); border-top: var(--hairline) solid var(--line-faint); cursor: pointer; }
+  ul.cuts .swatch { align-self: center; }
+  ul.cuts .len { font-size: var(--t-21); line-height: 21px; }
+  ul.cuts p { grid-column: 2 / -1; color: var(--ink-muted); }
+  ul.cuts li[aria-selected="true"] { background: var(--well); box-shadow: var(--glow-sacred); }
+
+  .board { display: grid; gap: var(--space-2); padding-block: var(--space-5); border-top: var(--hairline) solid var(--line-faint); }
+  .board .bar { display: flex; height: 13px; border: var(--hairline) solid var(--line); }
+  .board .bar span { display: block; height: 100%; border-right: var(--hairline) solid var(--ground); }
+  .board .bar .waste { background: repeating-linear-gradient(45deg, transparent 0 3px, var(--line-faint) 3px 4px); border-right: 0; }
+  ul.buy li { display: grid; grid-template-columns: 2.5em minmax(0, 1fr); column-gap: var(--space-3); padding-block: var(--space-5); border-top: var(--hairline) solid var(--line-faint); }
+  ul.buy p { grid-column: 2; color: var(--ink-muted); }
+
+  ul.checks li { display: grid; grid-template-columns: 13px minmax(0, 1fr); column-gap: var(--space-5); padding-block: var(--space-3); border-top: var(--hairline) solid var(--line-faint); }
+  ul.checks .diamond { width: 8px; height: 8px; margin-top: 6px; transform: rotate(45deg); border: var(--hairline) solid var(--line); background: var(--ink); }
+  ul.checks li[data-ok="false"] .diamond { background: transparent; border: 1px solid var(--solar); box-shadow: var(--glow-sacred); }
+  ul.checks li[data-ok="false"] { color: var(--solar); }
+
+  .notes { display: grid; gap: var(--space-5); max-width: 34em; }
+  .notes b { font-weight: 600; }
+
+  @media print {
+    .fold { display: block; }
+    .fold-stage, .controls, .stepper { display: none; }
+  }
+</style>
+
+<main class="fold">
+  <section class="fold-stage" aria-label="3D model">
+    <div class="title-block">
+      <h1 class="glyph">Pallet Loveseat</h1>
+      <p class="readout muted">FOLDYPHONE · SHEET 1 · <span id="envelope"></span></p>
+    </div>
+    <div id="view"><canvas aria-label="3D model of the loveseat. Drag to turn it, pinch to zoom, tap a part to name it."></canvas><p class="readout" id="pick"></p></div>
+    <div class="stepper">
+      <button class="crystal" id="prev" type="button" aria-label="Previous step">‹</button>
+      <div><span class="muted readout" id="step-count"></span><strong id="step-title"></strong></div>
+      <button class="crystal" id="next" type="button" aria-label="Next step">›</button>
+    </div>
+  </section>
+
+  <div class="fold-deck">
+    <section>
+      <p class="lede">Your two 48 × 40 pallets, kept whole, carried on three bolted side frames cut from four 2x4s. Turn the model, move a slider, and every length below follows.</p>
+      <dl class="rows" id="vitals" style="margin-top: var(--space-5)"></dl>
+    </section>
+
+    <section class="controls">
+      <h2 class="glyph">Shape</h2>
+      <div id="controls"></div>
+      <button class="crystal" id="reset" type="button">Return to the drawn design</button>
+    </section>
+
+    <section>
+      <h2 class="glyph">Build order</h2>
+      <ol class="steps" id="steps"></ol>
+    </section>
+
+    <section>
+      <h2 class="glyph">Cut list</h2>
+      <ul class="legend" id="legend"></ul>
+      <ul class="cuts" id="cuts"></ul>
+      <p class="muted" style="margin-top: var(--space-5)">Angles are what the miter saw's scale reads: 0° is a square cut. Clamp a stop block to the fence and cut each set of three against it, so they come out identical without measuring twice.</p>
+    </section>
+
+    <section>
+      <h2 class="glyph">Buy</h2>
+      <div id="boards"></div>
+      <ul class="buy" id="hardware"></ul>
+    </section>
+
+    <section>
+      <h2 class="glyph">Checks</h2>
+      <ul class="checks" id="checks"></ul>
+    </section>
+
+    <section>
+      <h2 class="glyph">Before you cut</h2>
+      <div class="notes">
+        <p><b>This is a starting design, not engineering.</b> It holds people. The members carrying them are the three rails, the three legs, and the six bolts at the foot of the back. The load numbers above are estimates. Load it gradually the first time: sit, then lean, then two of you.</p>
+        <p><b>Read the stamp on each pallet.</b> HT means heat treated and is fine to sit on. MB means fumigated with methyl bromide: do not use that one for furniture.</p>
+        <p><b>Pallet deck boards are thin.</b> They carry you sitting, spread across two or three boards. Do not stand on one.</p>
+        <p><b>Drawn from your photo, so check with a tape:</b> where the boards sit on the back pallet, the board width (drawn at 5 1/2 in), and that the seat pallet has bottom boards under its ends and middle. Deck thickness and stringer height have sliders above; set them to what your tape says.</p>
+        <p><b>The step that goes wrong:</b> building three identical frames. The right one is a mirror. If its leg is on the wrong face you will find out when the back pallet will not sit against the rail. Dry-fit before the glue.</p>
+        <p><b>What this build teaches:</b> the lap joint, and cutting repeated angles against a stop. You practise both on the first frame. The next step up is the half lap, where each piece is notched to half its thickness so the whole frame sits in one plane, the way the cedar chair in your reference does.</p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="../../kit/lumber.js"></script>
+<script src="../../kit/fold.js"></script>
+<script src="model.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const h = (tag, attrs, ...kids) => {
+    const n = document.createElement(tag);
+    for (const k in attrs || {}) { if (k === 'class') n.className = attrs[k]; else if (k === 'text') n.textContent = attrs[k]; else n.setAttribute(k, attrs[k]); }
+    n.append(...kids.filter((k) => k != null));
+    return n;
+  };
+  const { frac } = Lumber;
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const tint = (role) => { const d = h('span', { style: `color: var(--role-${role})` }); document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+
+  const state = { params: { ...Loveseat.DEFAULTS }, explode: 0, step: 0, picked: [] };
+  let model = Loveseat.build(state.params);
+  const WHOLE = () => model.steps.length + 1;
+  state.step = WHOLE();
+
+  /* ---------- 3D ---------- */
+  const canvas = document.querySelector('#view canvas');
+  let three = null;
+  if (window.THREE) {
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(32, 1, 1, 2000);
+    camera.position.set(-78, 62, 104);
+    const controls = new THREE.OrbitControls(camera, canvas);
+    controls.target.set(0, 20, 0);
+    controls.enableDamping = false;                    // nothing moves unless a finger moves it
+    controls.minDistance = 40; controls.maxDistance = 320;
+    controls.maxPolarAngle = Math.PI * 0.52;
+    controls.update();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x3a5f7a, 0.62));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.42); sun.position.set(-60, 120, 80); scene.add(sun);
+    const floor = new THREE.GridHelper(144, 12, 0xffffff, 0xffffff);
+    floor.material.transparent = true; floor.material.opacity = 0.12; scene.add(floor);
+    const group = new THREE.Group(); scene.add(group);
+    const draw = () => renderer.render(scene, camera);
+    controls.addEventListener('change', draw);
+    /* Pull the camera back along its current line of sight until the whole piece fits the leaf. */
+    const fit = () => {
+      const box = new THREE.Box3().setFromObject(group);
+      if (box.isEmpty()) return;
+      const ball = box.getBoundingSphere(new THREE.Sphere());
+      const half = THREE.MathUtils.degToRad(camera.fov / 2);
+      const tight = Math.min(half, Math.atan(Math.tan(half) * camera.aspect));
+      const dir = camera.position.clone().sub(controls.target).normalize();
+      controls.target.copy(ball.center);
+      camera.position.copy(ball.center).addScaledVector(dir, (ball.radius / Math.sin(tight)) * 0.92);
+      controls.update();
+    };
+    new ResizeObserver(() => {
+      const r = canvas.parentElement.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      renderer.setSize(r.width, r.height, false);
+      camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+      fit();
+      draw();
+    }).observe(canvas.parentElement);
+    three = { renderer, scene, camera, controls, group, draw, fit, meshes: [], ray: new THREE.Raycaster() };
+
+    let down = null;
+    canvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    canvas.addEventListener('pointerup', (e) => {
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 500) return;
+      const r = canvas.getBoundingClientRect();
+      three.ray.setFromCamera({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 }, camera);
+      const hit = three.ray.intersectObjects(three.meshes.filter((m) => m.visible))[0];
+      pick(hit ? [hit.object.userData.id] : []);
+    });
+  }
+
+  const MID_U = 24;
+  function prism(part) {
+    const [x0, x1] = part.x, n = part.poly.length, pos = [];
+    const P = (i, x) => [x - 24, part.poly[i][1], MID_U - part.poly[i][0]];
+    const tri = (a, b, c) => pos.push(...a, ...b, ...c);
+    for (let i = 1; i < n - 1; i++) { tri(P(0, x0), P(i, x0), P(i + 1, x0)); tri(P(0, x1), P(i + 1, x1), P(i, x1)); }
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; tri(P(i, x0), P(j, x0), P(j, x1)); tri(P(i, x0), P(j, x1), P(i, x1)); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  function rebuild() {
+    if (!three) return;
+    for (const o of [...three.group.children]) { o.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); }); three.group.remove(o); }
+    three.meshes = [];
+    const colors = {}; for (const r in Loveseat.ROLES) colors[r] = new THREE.Color(tint(r));
+    const ink = new THREE.Color(css('--ink') || '#E8EDF0'), ground = new THREE.Color(css('--ground') || '#3A5F7A');
+    three.palette = { colors, ink, ground, glow: new THREE.Color(css('--grid') || '#F0EDEA') };
+    for (const part of model.parts) {
+      const geo = prism(part);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }));
+      mesh.userData = { id: part.id, part };
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 20), new THREE.LineBasicMaterial({ transparent: true }));
+      mesh.add(edges);
+      three.group.add(mesh); three.meshes.push(mesh);
+    }
+    for (const lap of model.laps) {
+      if (!lap.at) continue;
+      const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, lap.x[1] - lap.x[0] + 0.5, 10), new THREE.MeshLambertMaterial());
+      bolt.rotation.z = Math.PI / 2;
+      bolt.userData = { lap, home: [(lap.x[0] + lap.x[1]) / 2 - 24, lap.at[1], MID_U - lap.at[0]] };
+      three.group.add(bolt);
+    }
+    paint();
+  }
+
+  /* Step, selection and pull-apart only repaint; they never rebuild. */
+  function paint() {
+    if (!three) return;
+    const { colors, ink, ground, glow } = three.palette, whole = state.step === WHOLE(), reach = 15 * state.explode;
+    for (const o of three.group.children) {
+      const part = o.userData.part, lap = o.userData.lap;
+      if (part) {
+        o.visible = part.step <= state.step;
+        o.position.set(part.explode[0] * reach, part.explode[1] * reach, -part.explode[2] * reach);
+        const earlier = !whole && part.step < state.step, picked = state.picked.includes(part.id);
+        o.material.color.copy(picked ? glow : colors[part.role]);
+        if (earlier && !picked) o.material.color.lerp(ground, 0.55);
+        o.children[0].material.color.copy(ink);
+        o.children[0].material.opacity = earlier ? 0.35 : 0.9;
+      } else if (lap) {
+        o.visible = lap.step <= state.step;
+        const side = lap.frame === 'L' ? -1 : lap.frame === 'R' ? 1 : 0;
+        o.position.set(o.userData.home[0] + side * reach, o.userData.home[1], o.userData.home[2]);
+        o.material.color.copy(colors.bolt);
+      }
+    }
+    three.draw();
+  }
+
+  /* ---------- deck ---------- */
+  function pick(ids) {
+    state.picked = ids;
+    const part = ids.length === 1 ? model.parts.find((p) => p.id === ids[0]) : null;
+    $('pick').textContent = part ? (part.stock ? `${part.name} · ${part.stock} · ${frac(part.length)} long edge` : `${part.name} · part of a pallet, no cutting`) : ids.length ? `${ids.length} parts lit` : '';
+    for (const li of document.querySelectorAll('#cuts li')) li.setAttribute('aria-selected', String(li.dataset.ids.split(',').some((id) => ids.includes(id))));
+    paint();
+  }
+
+  function setStep(n) {
+    state.step = Math.max(1, Math.min(WHOLE(), n));
+    const whole = state.step === WHOLE();
+    $('step-count').textContent = whole ? `${model.steps.length} steps` : `Step ${state.step} of ${model.steps.length}`;
+    $('step-title').textContent = whole ? 'The finished piece' : model.steps[state.step - 1].title;
+    $('prev').disabled = state.step === 1; $('next').disabled = whole;
+    document.querySelectorAll('#steps li').forEach((li, i) => { if (i + 1 === state.step) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current'); });
+    paint();
+  }
+
+  function fmt(c, v) { return c.unit === '°' ? `${v}°` : frac(v); }
+
+  function renderControls() {
+    const box = $('controls');
+    const row = (c, value, oninput) => {
+      const out = h('output', { class: 'readout', for: `c-${c.key}` });
+      const input = h('input', { type: 'range', id: `c-${c.key}`, min: c.min, max: c.max, step: c.step, value });
+      const sync = () => { out.textContent = c.format ? c.format(+input.value) : fmt(c, +input.value); };
+      input.addEventListener('input', () => { sync(); oninput(+input.value); });
+      sync();
+      return h('div', { class: 'control' }, h('label', { for: `c-${c.key}`, text: c.label }), out, input);
+    };
+    box.append(row({ key: 'explode', label: 'Pull apart', min: 0, max: 1, step: 0.01, format: (v) => `${Math.round(v * 100)}%` }, 0, (v) => { state.explode = v; paint(); }));
+    let measuredHead = false;
+    for (const c of Loveseat.CONTROLS) {
+      if (c.measured && !measuredHead) { box.append(h('h3', { text: 'From your tape' })); measuredHead = true; }
+      box.append(row(c, state.params[c.key], (v) => { state.params[c.key] = v; update(); }));
+    }
+  }
+
+  function renderModel() {
+    const d = model.d, o = model.overall;
+    $('envelope').textContent = `${frac(o.width)} W × ${frac(Math.round(o.depth))} D × ${frac(Math.round(o.height))} H`.replaceAll('"', '');
+    const vitals = [
+      ['Overall, width × depth × height', `${frac(o.width)} × ${frac(o.depth)} × ${frac(o.height)}`],
+      ['Seat height, front and rear', `${frac(d.seatFront)} · ${frac(d.seatRear)}`],
+      ['Angle between seat and back', `${d.seatToBack}°`],
+      ['Back rises above the seat', frac(d.backAbove)],
+      ['Weight, estimated', `${Math.round(d.weight)} lb`],
+    ];
+    $('vitals').replaceChildren(...vitals.map(([k, v]) => h('div', null, h('dt', { text: k }), h('dd', { class: 'readout', text: v }))));
+
+    $('steps').replaceChildren(...model.steps.map((s, i) => {
+      const li = h('li', null, h('h3', { text: s.title }), h('p', { text: s.body }),
+        h('p', { class: 'tagged' }, h('span', { text: 'Check' }), h('b', { text: s.check })),
+        h('p', { class: 'tagged' }, h('span', { text: 'Why' }), h('span', { text: s.why })));
+      li.addEventListener('click', () => setStep(i + 1));
+      return li;
+    }));
+
+    $('legend').replaceChildren(...Object.entries(Loveseat.ROLES).map(([role, name]) => h('li', null, h('span', { class: 'swatch', style: `background: var(--role-${role})` }), name)));
+    const rows = Lumber.cutList(model.lumber);
+    $('cuts').replaceChildren(...rows.map((r) => {
+      const short = model.lumber.find((p) => p.id === r.ids[0]).short;
+      const li = h('li', { 'data-ids': r.ids.join(','), 'aria-selected': 'false' },
+        h('span', { class: 'swatch', style: `background: var(--role-${r.role})` }),
+        h('span', { text: `${r.qty} × ${Loveseat.ROLES[r.role]} · ${r.stock}` }),
+        h('span', { class: 'readout len', text: frac(r.length) }),
+        h('p', { text: (Math.abs(r.length - short) > 1 / 32 ? `Long edge ${frac(r.length)}, short edge ${frac(short)}. ` : '') + r.cut }));
+      li.addEventListener('click', () => pick(state.picked.join() === r.ids.join() ? [] : r.ids));
+      return li;
+    }));
+
+    const packed = Lumber.packLinear(model.lumber, { lengths: [96] });
+    const role = (id) => model.lumber.find((p) => p.id === id).role;
+    $('boards').replaceChildren(...packed.flatMap((s) => [
+      h('p', null, h('span', { class: 'readout', text: `${s.count} × ` }), `${s.stock}, 8 ft. Cedar if you want the warmth of the reference; otherwise kiln-dried framing lumber, sealed on every face.`),
+      ...s.boards.map((b) => h('div', { class: 'board' },
+        h('div', { class: 'bar', role: 'img', 'aria-label': 'Board layout' },
+          ...b.cuts.map((c) => h('span', { style: `width: ${(c.length / b.length) * 100}%; background: var(--role-${role(c.id)})` })), h('span', { class: 'waste', style: 'flex: 1' })),
+        h('p', { class: 'readout muted', text: b.cuts.map((c) => `${Loveseat.ROLES[role(c.id)]} ${frac(c.length)}`).join(' · ') + ` · offcut ${frac(b.waste)}` }))),
+    ]));
+    $('hardware').replaceChildren(...model.hardware.map((x) => h('li', null, h('span', { class: 'readout', text: `${x.qty} ×` }), h('span', { text: x.item }), h('p', { text: x.why }))));
+
+    $('checks').replaceChildren(...model.checks.map((c) => h('li', { 'data-ok': String(c.ok && !c.note) }, h('span', { class: 'diamond' }), h('span', { text: c.text }))));
+  }
+
+  function update() {
+    model = Loveseat.build(state.params);
+    renderModel();
+    rebuild();
+    pick([]);
+    setStep(Math.min(state.step, WHOLE()));
+  }
+
+  $('prev').addEventListener('click', () => setStep(state.step - 1));
+  $('next').addEventListener('click', () => setStep(state.step + 1));
+  $('reset').addEventListener('click', () => {
+    state.params = { ...Loveseat.DEFAULTS };
+    for (const c of Loveseat.CONTROLS) { const i = $(`c-${c.key}`); i.value = c.value; i.dispatchEvent(new Event('input')); }
+  });
+
+  renderControls();
+  update();
+  if (three) { three.fit(); three.draw(); }
+  if (!three) $('pick').textContent = 'The 3D view could not load. Everything below still works.';
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => three && three.draw());
+})();
+</script>
