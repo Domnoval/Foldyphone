@@ -1,0 +1,199 @@
+<title>Fold Calibration</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel&family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600&display=swap">
+<link rel="stylesheet" href="codex.css">
+<link rel="stylesheet" href="fold.css">
+<style>
+  /* Layout: a drawing sheet. The viewport is drawn to scale on the stage with its title block;
+     the deck is the instrument readout beside it. */
+  .fold-stage { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-5); }
+  #plate { display: block; width: 100%; height: 100%; min-height: 0; }
+  #plate .edge { fill: none; stroke: var(--ink); stroke-width: 0.5; }
+  #plate .dim { fill: none; stroke: var(--line); stroke-width: 0.5; }
+  #plate .mark { fill: var(--ink); }
+  #plate .hinge { fill: none; stroke: var(--solar); stroke-width: 1; stroke-dasharray: 5 5; }
+  #plate text { fill: var(--ink); font: 400 13px var(--font-grid); }
+  #plate text.hinge-label { fill: var(--solar); font-size: 8px; letter-spacing: 0.137em; }
+
+  .title-block { display: grid; gap: var(--space-2); }
+  .title-block h1 { font-size: var(--t-21); }
+  .title-block p { margin: 0; font-size: var(--t-8); line-height: 13px; letter-spacing: 0.137em; }
+
+  .posture-now { display: grid; gap: var(--space-3); }
+  .posture-now .glyph { font-size: var(--t-34); }
+  .lede { margin: 0; max-width: 34em; }
+
+  dl.rows { margin: 0; display: grid; }
+  dl.rows > div {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-5); align-items: baseline;
+    padding-block: var(--space-3); border-top: var(--hairline) solid var(--line-faint);
+  }
+  dl.rows dt { color: var(--ink-muted); }
+  dl.rows dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+
+  ul.postures { list-style: none; margin: 0; padding: 0; display: grid; }
+  ul.postures li {
+    display: grid; grid-template-columns: 13px minmax(0, 1fr) auto; gap: var(--space-5); align-items: start;
+    padding-block: var(--space-5); border-top: var(--hairline) solid var(--line-faint);
+  }
+  ul.postures .diamond {
+    width: 8px; height: 8px; margin-top: 6px; transform: rotate(45deg);
+    border: var(--hairline) solid var(--line);
+  }
+  ul.postures li[aria-current="true"] .diamond { background: var(--solar); border-color: var(--solar); box-shadow: var(--glow-sacred); }
+  ul.postures .glyph { font-size: var(--t-13); line-height: 21px; }
+  ul.postures p { margin: 0; color: var(--ink-muted); }
+  ul.postures .seen { text-align: right; white-space: nowrap; }
+
+  .send { display: grid; gap: var(--space-5); justify-items: start; }
+  .send output { min-height: 21px; color: var(--ink-muted); }
+  #dump { width: 100%; box-sizing: border-box; margin: 0; padding: var(--space-5); background: var(--well); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+</style>
+
+<main class="fold">
+  <section class="fold-stage" aria-label="This screen, drawn to scale">
+    <div class="title-block">
+      <h1 class="glyph">Fold Calibration</h1>
+      <p class="readout muted">FOLDYPHONE · KIT · SHEET 0</p>
+    </div>
+    <svg id="plate" role="img" aria-label="Outline of the current viewport with its measurements"></svg>
+  </section>
+
+  <section class="fold-deck">
+    <div class="posture-now">
+      <span class="muted">This screen is reading as</span>
+      <p class="glyph" id="now">—</p>
+      <p class="lede">Close the phone, open it, then half-fold it on a table. Each shape gets measured as you make it. When all three have numbers, send the readout back to Claude.</p>
+    </div>
+
+    <dl class="rows" id="rows"></dl>
+
+    <ul class="postures" id="postures">
+      <li data-posture="cover"><span class="diamond"></span><div><h2 class="glyph">Cover</h2><p>One leaf. Model above, data below.</p></div><span class="readout seen">not seen yet</span></li>
+      <li data-posture="open"><span class="diamond"></span><div><h2 class="glyph">Open</h2><p>Two leaves meeting at the hinge. Model holds still, data scrolls.</p></div><span class="readout seen">not seen yet</span></li>
+      <li data-posture="flex"><span class="diamond"></span><div><h2 class="glyph">Flex</h2><p>Half-folded. Model on the upright leaf, controls on the flat one.</p></div><span class="readout seen">not seen yet</span></li>
+    </ul>
+
+    <div class="send">
+      <button class="crystal" id="copy" type="button">Copy readout</button>
+      <output id="said" for="copy"></output>
+      <pre class="readout" id="dump" hidden></pre>
+    </div>
+  </section>
+</main>
+
+<script src="fold.js"></script>
+<script>
+(function () {
+  const NS = 'http://www.w3.org/2000/svg';
+  const plate = document.getElementById('plate');
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const diamond = (x, y) => el('rect', { class: 'mark', x: x - 3, y: y - 3, width: 6, height: 6, transform: `rotate(45 ${x} ${y})` });
+
+  const KEY = 'fold-calibration-seen';
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { seen = {}; }
+  let model = '';
+  let last = null;
+
+  function draw(r) {
+    const box = plate.getBoundingClientRect();
+    const W = box.width, H = box.height;
+    plate.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    plate.replaceChildren();
+    const top = 34, pad = 34;
+    const s = Math.min((W - pad * 2) / r.w, (H - top - pad) / r.h);
+    const w = r.w * s, h = r.h * s;
+    const x = (W - w) / 2 + 8, y = top + (H - top - pad - h) / 2;
+
+    plate.append(el('rect', { class: 'edge', x, y, width: w, height: h }));
+    // width, measured along the top
+    plate.append(el('line', { class: 'dim', x1: x, y1: y - 13, x2: x + w, y2: y - 13 }), diamond(x, y - 13), diamond(x + w, y - 13));
+    plate.append(el('text', { x: x + w / 2, y: y - 21, 'text-anchor': 'middle' }, String(r.w)));
+    // height, measured down the left
+    plate.append(el('line', { class: 'dim', x1: x - 13, y1: y, x2: x - 13, y2: y + h }), diamond(x - 13, y), diamond(x - 13, y + h));
+    plate.append(el('text', { x: x - 21, y: y + h / 2, 'text-anchor': 'middle', transform: `rotate(-90 ${x - 21} ${y + h / 2})` }, String(r.h)));
+
+    if (r.hinge) {
+      const label = r.hinge.measured ? 'HINGE' : 'HINGE, ASSUMED CENTRE';
+      if (r.hinge.axis === 'vertical') {
+        const hx = x + w * r.hinge.at;
+        plate.append(el('line', { class: 'hinge', x1: hx, y1: y, x2: hx, y2: y + h }));
+        plate.append(el('text', { class: 'hinge-label', x: hx + 8, y: y + h - 8 }, label));
+      } else {
+        const hy = y + h * r.hinge.at;
+        plate.append(el('line', { class: 'hinge', x1: x, y1: hy, x2: x + w, y2: hy }));
+        plate.append(el('text', { class: 'hinge-label', x: x + 8, y: hy - 8 }, label));
+      }
+    }
+  }
+
+  function facts(r) {
+    return [
+      ['Viewport', `${r.w} × ${r.h} css px`],
+      ['Pixel ratio', String(Math.round(r.dpr * 1000) / 1000)],
+      ['Physical pixels', `${Math.round(r.w * r.dpr)} × ${Math.round(r.h * r.dpr)}`],
+      ['Whole screen', `${screen.width} × ${screen.height}`],
+      ['Device posture', r.devicePosture || 'not reported'],
+      ['Viewport segments', r.segments ? `${r.segments.cols} across, ${r.segments.rows} down` : 'not reported'],
+      ['Pointer', r.pointer],
+    ].concat(model ? [['Model', model]] : []);
+  }
+
+  function render(r) {
+    last = r;
+    seen[r.posture] = `${r.w} × ${r.h}`;
+    try { localStorage.setItem(KEY, JSON.stringify(seen)); } catch (e) { /* fine without it */ }
+
+    document.getElementById('now').textContent = r.posture;
+    document.getElementById('rows').replaceChildren(...facts(r).map(([k, v]) => {
+      const row = document.createElement('div');
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd'); dd.className = 'readout'; dd.textContent = v;
+      row.append(dt, dd);
+      return row;
+    }));
+    for (const li of document.querySelectorAll('#postures li')) {
+      const p = li.dataset.posture;
+      if (p === r.posture) li.setAttribute('aria-current', 'true'); else li.removeAttribute('aria-current');
+      li.querySelector('.seen').textContent = seen[p] || 'not seen yet';
+    }
+    draw(r);
+  }
+
+  function readoutText() {
+    const lines = ['Fold calibration'];
+    for (const p of ['cover', 'open', 'flex']) lines.push(`${p}: ${seen[p] || 'not seen'}`);
+    lines.push('', `now: ${last.posture}`);
+    for (const [k, v] of facts(last)) lines.push(`${k.toLowerCase()}: ${v}`);
+    return lines.join('\n');
+  }
+
+  document.getElementById('copy').addEventListener('click', () => {
+    const text = readoutText();
+    const said = document.getElementById('said');
+    const dump = document.getElementById('dump');
+    const fallback = () => {
+      dump.textContent = text;
+      dump.hidden = false;
+      said.textContent = 'Copying is blocked here. Long-press the block below and copy it.';
+    };
+    if (!navigator.clipboard) return fallback();
+    navigator.clipboard.writeText(text).then(() => { said.textContent = 'Copied. Paste it into the chat.'; }, fallback);
+  });
+
+  if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+    navigator.userAgentData.getHighEntropyValues(['model']).then((d) => {
+      if (d.model) { model = d.model; if (last) render(last); }
+    }, () => {});
+  }
+
+  Fold.watch(render);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => last && draw(last));
+})();
+</script>

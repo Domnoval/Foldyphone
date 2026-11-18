@@ -1,0 +1,10 @@
+{
+  "name": "foldyphone",
+  "private": true,
+  "description": "Phone-first build studio. Parametric plans, viewed on a Galaxy Fold.",
+  "scripts": {
+    "test": "node --test kit/kit.test.js",
+    "build": "node scripts/build.mjs",
+    "shots": "node scripts/shots.mjs"
+  }
+}

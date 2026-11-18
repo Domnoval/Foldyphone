@@ -1,0 +1,134 @@
+/* Transmission Codex, as CSS.
+   Synced by hand from the Transmission Codex design-system artifact (tokens.json v1).
+   137-codex on Daywalker is canonical. When they disagree, 137-codex wins and this file gets re-synced.
+
+   This repo's mapping (derived here, overrule freely):
+     screen  -> Blueprint. The construction is the content.
+     print   -> Signal. Parchment ground, for the shop wall. */
+
+:root {
+  /* palette */
+  --thoth: #0B0A0F;
+  --crow: #12111E;
+  --cinnabar: #C63D27;
+  --vermillion: #A83828;
+  --solar: #D4940C;
+  --signal: #1F8B8B;
+  --parchment: #E6DCBE;
+  --noise: #DE5E9A;
+  --ember: #D4601A;
+  --dimension: #3A5F7A;
+  --blueprint: #E8EDF0;
+  --grid: #F0EDEA;
+  --halftone: #8A8880;
+  --codex-void: #080808;
+
+  /* mode: Blueprint by default */
+  --ground: var(--dimension);
+  --ink: var(--blueprint);
+  --ink-muted: var(--parchment);
+  color-scheme: dark;
+
+  /* derived from the mode */
+  --line: color-mix(in srgb, var(--ink) 62%, transparent);
+  --line-faint: color-mix(in srgb, var(--ink) 26%, transparent);
+  --well: color-mix(in srgb, var(--ground) 82%, var(--thoth));
+
+  /* faces */
+  --font-glyph: Cinzel, "Cormorant Garamond", "IM Fell English", Georgia, serif;
+  --font-grid: "IBM Plex Mono", "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
+  --font-signal: Syne, "DM Sans", Outfit, system-ui, sans-serif;
+
+  /* Fibonacci type scale */
+  --t-8: 8px;
+  --t-13: 13px;
+  --t-21: 21px;
+  --t-34: 34px;
+  --t-55: 55px;
+  --t-89: 89px;
+  --track-glyph: 0.137em;
+
+  /* Fibonacci spacing chain */
+  --space-1: 3px;
+  --space-2: 5px;
+  --space-3: 8px;
+  --space-5: 13px;
+  --space-8: 21px;
+  --space-13: 34px;
+  --space-21: 55px;
+  --space-34: 89px;
+  --space-137: 137px;
+
+  /* shape: crystal or mandala, nothing between */
+  --radius-crystal: 0;
+  --radius-mandala: 50%;
+  --hairline: 0.5px;
+
+  /* depth is light */
+  --glow-sacred: 0 0 13px rgba(212, 148, 12, 0.34);
+  --glow-portal: 0 0 34px rgba(198, 61, 39, 0.55);
+  --glow-signal: 0 0 21px rgba(31, 139, 139, 0.44);
+
+  --grain-opacity: 0.06;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+:root[data-mode="void"] { --ground: var(--thoth); --ink: var(--grid); --ink-muted: var(--halftone); color-scheme: dark; }
+:root[data-mode="signal"] { --ground: var(--parchment); --ink: var(--thoth); --ink-muted: var(--vermillion); color-scheme: light; }
+:root[data-mode="codex"] { --ground: var(--codex-void); --ink: var(--parchment); --ink-muted: var(--halftone); color-scheme: dark; }
+
+@media print {
+  :root { --ground: var(--parchment); --ink: var(--thoth); --ink-muted: var(--vermillion); color-scheme: light; }
+  body::after { display: none; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 var(--t-13) / 21px var(--font-signal);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Grain is always on. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background-image: var(--grain);
+  opacity: var(--grain-opacity);
+}
+
+/* The three registers */
+.glyph {
+  margin: 0;
+  font-family: var(--font-glyph);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: var(--track-glyph);
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.readout {
+  font-family: var(--font-grid);
+  font-variant-numeric: tabular-nums;
+}
+.muted { color: var(--ink-muted); }
+
+/* A control is a crystal: square, hairline, 55 tall so a thumb finds it. */
+.crystal {
+  appearance: none;
+  min-height: var(--space-21);
+  padding: 0 var(--space-8);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-crystal);
+  background: transparent;
+  color: var(--ink);
+  font: 400 var(--t-13) / 21px var(--font-signal);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.crystal:active { background: var(--well); box-shadow: var(--glow-sacred); }
+.crystal:focus-visible, a:focus-visible { outline: 1px solid var(--solar); outline-offset: 3px; }

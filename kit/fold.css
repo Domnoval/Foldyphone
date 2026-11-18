@@ -1,0 +1,77 @@
+/* The device is the grid.
+
+   cover  one leaf. The stage sits above the deck and the page scrolls.
+   open   two leaves meeting at the hinge. Stage holds still on the left, deck scrolls on the right.
+   flex   half-folded like a laptop. Stage on the upright leaf, deck on the flat one.
+
+   .fold        the whole device
+   .fold-stage  the thing you look at (model, drawing)
+   .fold-deck   the things you read and touch (controls, cut list, steps)
+
+   kit/fold.js mirrors these exact conditions for scripts that need to know the posture. */
+
+.fold {
+  --leaf-h: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-8);
+  padding-block: var(--space-8);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.fold-stage {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  aspect-ratio: 1;
+}
+.fold-deck {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-13);
+  align-content: start;
+}
+
+/* open: 600 is past every cover screen and short of every inner one */
+@media (min-width: 600px) {
+  .fold {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0;
+    padding-block: 0;
+  }
+  .fold-stage {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    aspect-ratio: auto;
+    height: var(--leaf-h);
+    /* keep ink off the crease */
+    padding: var(--space-8) var(--space-8) var(--space-8) 0;
+    box-sizing: border-box;
+  }
+  .fold-deck {
+    padding: var(--space-8) 0 var(--space-13) var(--space-8);
+    border-left: var(--hairline) solid var(--line-faint);
+  }
+}
+
+/* flex: the hinge is horizontal */
+@media (vertical-viewport-segments: 2), (device-posture: folded) and (orientation: landscape) {
+  .fold {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: env(viewport-segment-height 0 0, 1fr) minmax(0, 1fr);
+    height: var(--leaf-h);
+    box-sizing: border-box;
+  }
+  .fold-stage {
+    position: relative;
+    top: auto;
+    height: auto;
+    padding: var(--space-8) 0 var(--space-5);
+  }
+  .fold-deck {
+    overflow-y: auto;
+    padding: var(--space-8) 0;
+    border-left: 0;
+    border-top: var(--hairline) solid var(--line-faint);
+  }
+}
